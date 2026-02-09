@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+        #time {
+            font-size: 18px;
+            font-weight: 600;
+            line-height: 1.1;
+            letter-spacing: 0.5px;
+        }
+        #date {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="time">00:00</div>
+    <div id="date">--/--</div>
+    <script>
+        const { ipcRenderer } = require('electron');
+        const timeEl = document.getElementById('time');
+        const dateEl = document.getElementById('date');
+        let showSeconds = false;
+
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            if (showSeconds) {
+                timeEl.innerText = `${hours}:${minutes}:${seconds}`;
+            } else {
+                timeEl.innerText = `${hours}:${minutes}`;
+            }
+
+            const month = now.getMonth() + 1;
+            const day = now.getDate();
+            const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const weekDay = weekDays[now.getDay()];
+            
+            dateEl.innerText = `${month}/${day} ${weekDay}`;
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        ipcRenderer.on('config-updated', (event, config) => {
+            if (config) {
+                if (config.showSeconds !== undefined) showSeconds = config.showSeconds;
+                updateClock();
+            }
+        });
+    </script>
+</body>
+</html>

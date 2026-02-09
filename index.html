@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <!-- Remix Icon -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@2.5.0/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body>
+    <!-- View Layer: The actual status bar -->
+    <div id="status-bar-container">
+        <div id="widgets-area">
+            <!-- Widgets will be injected here -->
+        </div>
+    </div>
+
+    <!-- Edit Layer: Overlay and Panel -->
+    <div id="edit-overlay" style="display: none;">
+        <div class="edit-backdrop"></div>
+        
+        <!-- Component Panel (Centered) -->
+        <div id="component-panel">
+            <div class="panel-header">
+                <span>组件库</span>
+                <button id="close-edit-btn"><i class="ri-close-line"></i></button>
+            </div>
+            <div class="panel-content" id="component-list">
+                <!-- Component Items -->
+            </div>
+        </div>
+
+        <!-- Hint -->
+        <div class="edit-hint">拖拽组件到左上角的状态栏区域</div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

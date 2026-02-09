@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        #clock {
+            cursor: default;
+        }
+    </style>
+</head>
+<body>
+    <div id="clock">00:00</div>
+    <script>
+        const { ipcRenderer } = require('electron');
+        const clockEl = document.getElementById('clock');
+        let showSeconds = false;
+
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            if (showSeconds) {
+                clockEl.innerText = `${hours}:${minutes}:${seconds}`;
+            } else {
+                clockEl.innerText = `${hours}:${minutes}`;
+            }
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        ipcRenderer.on('config-updated', (event, config) => {
+            if (config) {
+                if (config.showSeconds !== undefined) showSeconds = config.showSeconds;
+                updateClock();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "id": "sidebar-top-status",
+  "name": "边栏.顶部状态",
+  "icon": "ri-layout-top-line",
+  "version": "1.2.1",
+  "author": "OrbiBoard",
+  "description": "顶部状态栏，支持自定义组件",
+  "type": "plugin",
+  "entry": "index.html",
+  "actions": [
+    {
+      "id": "toggleEditMode",
+      "text": "编辑状态栏",
+      "target": "toggleEditMode",
+      "icon": "ri-edit-line"
+    }
+  ],
+  "components": [
+    {
+      "id": "sidebar-clock",
+      "name": "状态栏时钟",
+      "description": "显示当前时间的简约时钟",
+      "entry": "components/clock.html",
+      "group": "sidebar_widget",
+      "icon": "ri-time-line",
+      "recommendedSize": { "width": 100, "height": 40 },
+      "configSchema": {
+        "showSeconds": { "type": "boolean", "default": false, "label": "显示秒" }
+      }
+    },
+    {
+      "id": "sidebar-digital-clock",
+      "name": "数字时钟 (带日期)",
+      "description": "显示时间与日期的时钟组件",
+      "entry": "components/digital-clock.html",
+      "group": "sidebar_widget",
+      "icon": "ri-calendar-line",
+      "recommendedSize": { "width": 100, "height": 40 },
+      "configSchema": {
+        "showSeconds": { "type": "boolean", "default": false, "label": "显示秒" }
+      }
+    }
+  ],
+  "functions": {
+    "actions": [
+      {
+        "id": "toggleEditMode",
+        "text": "编辑状态栏",
+        "target": "toggleEditMode",
+        "icon": "ri-edit-line"
+      }
+    ]
+  }
+}
