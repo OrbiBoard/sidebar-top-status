@@ -98,31 +98,47 @@ function setupEventListeners() {
 }
 
 function setupDragAndDrop() {
-    // Drag Over on Status Bar
-    statusBar.addEventListener('dragover', (e) => {
+    // Helper to ensure we allow dropping on the widgets area too
+    const handleDragOver = (e) => {
         if (!isEditMode) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
         statusBar.style.borderColor = '#007bff';
         statusBar.style.background = 'rgba(50, 50, 50, 0.95)';
-    });
+    };
+    
+    // Bind to both container and inner area to ensure no gaps
+    statusBar.addEventListener('dragover', handleDragOver);
+    widgetsArea.addEventListener('dragover', handleDragOver);
 
-    statusBar.addEventListener('dragleave', () => {
+    const handleDragLeave = (e) => {
         if (!isEditMode) return;
-        statusBar.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-        statusBar.style.background = 'rgba(40, 40, 40, 0.95)';
-    });
+        // Only reset if we are leaving the main container
+        if (e.target === statusBar || e.target === widgetsArea) {
+             // Maybe debounce or check relatedTarget? 
+             // Simplification: just reset style, if re-enter it will set again
+             statusBar.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+             statusBar.style.background = 'rgba(40, 40, 40, 0.95)';
+        }
+    };
 
-    statusBar.addEventListener('drop', (e) => {
+    statusBar.addEventListener('dragleave', handleDragLeave);
+
+    const handleDrop = (e) => {
         if (!isEditMode) return;
         e.preventDefault();
+        e.stopPropagation(); // Stop bubbling
+        
         statusBar.style.borderColor = 'rgba(255, 255, 255, 0.3)';
         
         const componentId = e.dataTransfer.getData('text/plain');
         if (componentId) {
             addWidget(componentId);
         }
-    });
+    };
+
+    statusBar.addEventListener('drop', handleDrop);
+    widgetsArea.addEventListener('drop', handleDrop);
 }
 
 function toggleEditMode(forceState) {
@@ -240,27 +256,57 @@ function saveConfig() {
 function renderWidgets() {
     widgetsArea.innerHTML = '';
     
+    // Clear old listeners
+    const containerEl = document.getElementById('status-bar-container');
+    // We can't easily clear specific listeners but we can ensure we only bind once or manage state.
+    // For now, let's rely on event bubbling.
+
     widgets.forEach(widget => {
         const comp = getComponentById(widget.componentId);
-        // If component not found (maybe plugin unloaded), render placeholder or skip?
-        // Let's render placeholder
         
         const container = document.createElement('div');
         container.className = 'widget-item';
-        // Set dynamic width if component specifies it?
-        // For status bar, usually auto width.
-        // But webviews need explicit size often.
-        // Let's set a default width or read from component recommmendedSize
-        let width = 100;
+        // Add event listeners for mouse interaction (click-through management)
+        container.addEventListener('mouseenter', () => {
+            if (!isEditMode) {
+                // Standalone mode: we can control ignoreMouseEvents.
+                // If we want to interact with widgets (e.g. click), we must set ignore to false.
+                // But the requirement is "Need pass-through... on hover make semi-transparent".
+                // If we set ignore=false, we block clicks to background.
+                // If the user wants to click the widget, we need ignore=false.
+                // If the user wants to click THROUGH the widget, we keep ignore=true.
+                
+                // Assuming "pass-through" means click-through.
+                // But usually widgets like clocks might have settings on click?
+                // The previous behavior (before service-toplayer attempt) was: 
+                // mouseenter -> ignore=false (capture)
+                // mouseleave -> ignore=true (pass-through)
+                
+                // User said: "不需要选择" (no selection needed) "仅需要穿透时接受一个信号将组件半透明即可".
+                // This strongly implies: NO CLICK INTERACTION in view mode. Just visual feedback.
+                // So we do NOT send 'set-ignore-mouse' false.
+                // We just let the CSS hover effect handle the visual part.
+                
+                // However, if we want to drag/move widgets, we need Edit Mode.
+                // So in View Mode, it is purely a display layer.
+                // Therefore, we do NOTHING here regarding IPC.
+                
+                container.style.opacity = '0.5';
+            }
+        });
+        container.addEventListener('mouseleave', () => {
+            if (!isEditMode) {
+                container.style.opacity = '1';
+            }
+        });
+
+        // Set dynamic width
+        let width = 120;
         if (comp && comp.recommendedSize && comp.recommendedSize.width) {
-            // Scale down? Or use as is. Status bar is small.
-            // Maybe we just allow it to flow.
             width = comp.recommendedSize.width; 
         }
-        // container.style.width = `${width}px`; // Don't force width, let content dictate? Webview needs width.
-        // Actually, for status bar widgets, they should be responsive or fixed small.
-        // Let's give a reasonable default and allow style override.
-        container.style.width = '120px'; // Default width for standard widgets
+        container.style.width = `${width}px`; // Apply width
+
         
         if (comp) {
              const webview = document.createElement('webview');
@@ -330,11 +376,20 @@ function renderWidgets() {
         widgetsArea.appendChild(container);
     });
     
-    // Trigger size update
-    setTimeout(() => {
-        const width = widgetsArea.scrollWidth + 40;
-        ipcRenderer.send('sidebar-status:update-bounds', { width: Math.max(200, width) });
-    }, 50);
+    // In View mode, we want to be pass-through.
+    // However, since we are now hosted in service-toplayer, we can't easily control the window's ignoreMouse.
+    // We rely on service-toplayer's shape calculation.
+    // service-toplayer uses widget bounds. We are full width.
+    // So we block mouse everywhere.
+    // Unless we update our widget bounds to 0x0 or off-screen? No.
+    
+    // We need a way to tell service-toplayer to ignore our shape contribution.
+    // Currently not supported.
+    
+    // For now, removing the IPC call that was failing or useless.
+    if (!isEditMode && widgets.length === 0) {
+        // ipcRenderer.send('sidebar-status:set-ignore-mouse', true);
+    }
 }
 
 // Start

@@ -15,13 +15,13 @@ function createStatusWindow() {
   if (statusWindow && !statusWindow.isDestroyed()) return;
 
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { x, y, width, height } = primaryDisplay.bounds;
+  const { x, y, width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
   // Initial State: View Mode (Top Bar)
   const initialBounds = {
-      x: x + BAR_MARGIN_LEFT,
+      x: x,
       y: y + BAR_MARGIN_TOP,
-      width: BAR_WIDTH,
+      width: screenWidth, // Full width
       height: BAR_HEIGHT
   };
 
@@ -31,15 +31,26 @@ function createStatusWindow() {
     frame: false,
     transparent: true,
     resizable: false, // We handle resizing manually via setBounds
-    movable: true,    // Allow moving in view mode? Maybe restrict.
+    movable: false,    // Fixed position
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    focusable: false, // Don't steal focus in view mode
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      webviewTag: true // Enable webview for widgets
     }
   });
+
+  // Ensure it stays on top
+  statusWindow.setAlwaysOnTop(true, 'screen-saver');
+
+  // Initial state: ignore mouse events (allow click-through)
+  // forward: true is crucial to allow mouse events to pass to apps behind
+  // while still allowing Chromium to receive mousemove/mouseenter (if supported by OS)
+  // On Windows, this works perfectly for "click-through but interactive on hover" visual effects.
+  statusWindow.setIgnoreMouseEvents(true, { forward: true });
 
   statusWindow.loadFile(path.join(__dirname, 'index.html'));
   
@@ -48,46 +59,62 @@ function createStatusWindow() {
   });
 
   // IPC Handlers
+  
+  ipcMain.on('sidebar-status:set-ignore-mouse', (event, ignore) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win || win !== statusWindow) return;
+      
+      if (ignore) {
+          win.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+          // When not ignoring, we capture clicks.
+          // Used for Edit Mode.
+          win.setIgnoreMouseEvents(false);
+      }
+  });
+
   ipcMain.on('sidebar-status:set-mode', (event, mode) => {
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win || win !== statusWindow) return;
 
       isEditMode = (mode === 'edit');
       
+      const display = screen.getDisplayMatching(win.getBounds());
+      
       if (isEditMode) {
           // Fullscreen for editing
-          const display = screen.getDisplayMatching(win.getBounds());
           win.setBounds(display.bounds);
+          // In Edit Mode, we need to capture clicks
           win.setIgnoreMouseEvents(false);
-          // Bring to front mainly for the overlay
-          win.setAlwaysOnTop(true, 'screen-saver'); // Force highest level
+          win.setFocusable(true); 
+          win.setAlwaysOnTop(true, 'screen-saver'); 
           win.moveTop();
+          win.focus();
       } else {
           // Revert to Bar Mode
-          const display = screen.getDisplayMatching(win.getBounds());
           win.setBounds({
-              x: display.bounds.x + BAR_MARGIN_LEFT,
+              x: display.bounds.x,
               y: display.bounds.y + BAR_MARGIN_TOP,
-              width: BAR_WIDTH, // This should ideally be dynamic
+              width: display.bounds.width, 
               height: BAR_HEIGHT
           });
-          // In view mode, we interact with widgets, so don't ignore mouse
-          win.setIgnoreMouseEvents(false);
-          win.setAlwaysOnTop(true, 'floating'); // Force top level
+          // In View Mode, we ignore mouse clicks (pass-through)
+          // But allow forwarding so we can maybe detect hover? 
+          // Actually, if we want PURE pass-through where clicks go behind, 
+          // we use forward: true.
+          win.setIgnoreMouseEvents(true, { forward: true });
+          win.setFocusable(false);
+          win.setAlwaysOnTop(true, 'screen-saver');
           win.moveTop();
       }
   });
 
   ipcMain.on('sidebar-status:update-bounds', (event, bounds) => {
-      if (!isEditMode && statusWindow) {
-          const current = statusWindow.getBounds();
-          statusWindow.setBounds({
-              ...current,
-              width: bounds.width || current.width,
-              height: bounds.height || current.height
-          });
-      }
+      // In standalone mode, we handle bounds updates if necessary
+      // But we generally stick to full width now.
   });
+
+  // ... (rest of IPC handlers for config) ...
 
   ipcMain.handle('sidebar-status:get-components', async () => {
       if (pluginApi && pluginApi.components && pluginApi.components.list) {
@@ -100,16 +127,22 @@ function createStatusWindow() {
                   allComponents = res.components;
               }
 
-              // Filter for sidebar widgets
-              const filtered = allComponents.filter(c => c.group === 'sidebar_widget');
+              // Filter for sidebar widgets and the new clock group
+              const filtered = allComponents.filter(c => c.group === 'sidebar_widget' || c.group === 'sidebar_clock');
 
-              // Ensure URL is present (especially for local components)
+              // Resolve URLs for all components
               filtered.forEach(c => {
-                  if (!c.url && c.entry) {
-                      // If entry is relative and it's our component (or we assume it is relative to plugin dir)
-                      // Ideally we should match plugin ID, but c.pluginId might be available
-                      // Fallback: Resolve relative to THIS plugin's dir if it looks like ours
-                      if (!path.isAbsolute(c.entry)) {
+                  if (!c.url) {
+                      // Try to get absolute URL via API
+                      if (pluginApi && pluginApi.components && pluginApi.components.entryUrl) {
+                          const url = pluginApi.components.entryUrl(c.id);
+                          if (url && typeof url === 'string') {
+                              c.url = url;
+                          }
+                      }
+                      
+                      // Fallback for local components if API didn't resolve (e.g. not in manifest correctly)
+                      if (!c.url && c.entry && !path.isAbsolute(c.entry)) {
                            c.url = 'file:///' + path.join(__dirname, c.entry).replace(/\\/g, '/');
                       }
                   }
@@ -138,6 +171,16 @@ function createStatusWindow() {
   });
 }
 
+// Helper to find our widget's webContents to send messages
+function getWidgetWebContents() {
+    const all = require('electron').webContents.getAllWebContents();
+    // Look for our URL (normalized)
+    const targetUrl = require('url').pathToFileURL(path.join(__dirname, 'index.html')).href;
+    // Note: webview URL might have encoded characters or query params?
+    // Usually exact match works for file://
+    return all.find(wc => wc.getURL().startsWith(targetUrl));
+}
+
 module.exports = {
   name: '边栏.顶部状态',
   init: (api) => {
@@ -146,8 +189,9 @@ module.exports = {
   },
   functions: {
     toggleEditMode: () => {
-      if (statusWindow && !statusWindow.isDestroyed()) {
-        statusWindow.webContents.send('toggle-edit-mode');
+      const wc = getWidgetWebContents();
+      if (wc && !wc.isDestroyed()) {
+        wc.send('toggle-edit-mode');
       }
     }
   }
