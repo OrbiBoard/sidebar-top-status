@@ -60,6 +60,12 @@ function createStatusWindow() {
 
   // IPC Handlers
   
+  // Settings Action
+  ipcMain.on('sidebar-status:open-settings', (event) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (win) win.webContents.send('open-settings');
+  });
+
   ipcMain.on('sidebar-status:set-ignore-mouse', (event, ignore) => {
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win || win !== statusWindow) return;
@@ -186,12 +192,61 @@ module.exports = {
   init: (api) => {
     pluginApi = api;
     createStatusWindow();
+    
+    // Register as notification provider
+    setTimeout(() => {
+        if (pluginApi && typeof pluginApi.call === 'function') {
+            // We need to pass a callback function that will be executed by notify-plugin.
+            // But pluginApi.call serializes arguments? No, usually in-process or via remote object.
+            // In OrbiBoard, pluginApi.call usually goes via PluginManager.
+            // If plugins are in same process (Main), functions can be passed if not over IPC.
+            // If notify-plugin is in same process, we can pass function directly.
+            
+            // However, the `handler` argument in `registerProvider` is expected to be a function.
+            // Let's assume direct function passing works between plugins in Main process.
+            
+            try {
+                // If notify-plugin exposes `registerProvider` as a function in `functions` export:
+                const notifyPlugin = require('../notify-plugin/index.js'); // Direct require if possible? No, paths might vary.
+                // Better use api.call if supported.
+                
+                // Wait, api.call(target, fnName, ...args).
+                // If args contain function, it might be lost if over IPC.
+                // But here all plugins run in Main process context usually.
+                // So function reference should work.
+                
+                pluginApi.call('notify-plugin', 'registerProvider', 
+                    'sidebar-top-status', 
+                    '顶部边栏', 
+                    (payload) => {
+                        const wc = getWidgetWebContents();
+                        if (wc && !wc.isDestroyed()) {
+                            wc.send('show-notification', payload);
+                        }
+                    }
+                ).then(() => console.log('Registered sidebar-top-status as notification provider'))
+                 .catch(e => {
+                     // If call fails (e.g. notify-plugin not ready or function passing not supported),
+                     // we might need another way. But let's try this first.
+                     console.error('Failed to register provider:', e);
+                 });
+            } catch (err) {
+                console.error('Error in sidebar-top-status provider registration:', err);
+            }
+        }
+    }, 2000);
   },
   functions: {
     toggleEditMode: () => {
       const wc = getWidgetWebContents();
       if (wc && !wc.isDestroyed()) {
         wc.send('toggle-edit-mode');
+      }
+    },
+    openSettings: () => {
+      const wc = getWidgetWebContents();
+      if (wc && !wc.isDestroyed()) {
+        wc.send('open-settings');
       }
     }
   }

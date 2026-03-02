@@ -13,34 +13,15 @@
       "text": "编辑状态栏",
       "target": "toggleEditMode",
       "icon": "ri-edit-line"
-    }
-  ],
-  "components": [
-    {
-      "id": "sidebar-clock",
-      "name": "状态栏时钟",
-      "description": "显示当前时间的简约时钟",
-      "entry": "components/clock.html",
-      "group": "sidebar_widget",
-      "icon": "ri-time-line",
-      "recommendedSize": { "width": 100, "height": 40 },
-      "configSchema": {
-        "showSeconds": { "type": "boolean", "default": false, "label": "显示秒" }
-      }
     },
     {
-      "id": "sidebar-digital-clock",
-      "name": "数字时钟 (带日期)",
-      "description": "显示时间与日期的时钟组件",
-      "entry": "components/digital-clock.html",
-      "group": "sidebar_widget",
-      "icon": "ri-calendar-line",
-      "recommendedSize": { "width": 100, "height": 40 },
-      "configSchema": {
-        "showSeconds": { "type": "boolean", "default": false, "label": "显示秒" }
-      }
+      "id": "openSettings",
+      "text": "状态栏设置",
+      "target": "openSettings",
+      "icon": "ri-settings-3-line"
     }
   ],
+  "components": [],
   "functions": {
     "actions": [
       {
@@ -48,6 +29,12 @@
         "text": "编辑状态栏",
         "target": "toggleEditMode",
         "icon": "ri-edit-line"
+      },
+      {
+        "id": "openSettings",
+        "text": "状态栏设置",
+        "target": "openSettings",
+        "icon": "ri-settings-3-line"
       }
     ]
   }

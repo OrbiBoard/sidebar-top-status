@@ -3,14 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="style.css">
+    <title>Sidebar Top Status</title>
     <!-- Remix Icon -->
     <link href="https://cdn.jsdelivr.net/npm/remixicon@2.5.0/fonts/remixicon.css" rel="stylesheet">
 </head>
 <body>
     <!-- View Layer: The actual status bar -->
     <div id="status-bar-container">
-        <div id="widgets-area">
-            <!-- Widgets will be injected here -->
+        <!-- Back Layer: Notification Area -->
+        <div id="notification-container">
+            <div id="notification-display"></div>
+        </div>
+
+        <!-- Front Layer: Time & Widgets -->
+        <div id="front-layer">
+            <!-- Time Component (Built-in) -->
+            <div id="time-display">
+                <span id="time-text">00:00</span>
+            </div>
+            
+            <!-- Widgets Area (Directly next to time) -->
+            <div id="widgets-area">
+                <!-- Widgets will be injected here -->
+            </div>
         </div>
     </div>
 
@@ -22,10 +37,26 @@
         <div id="component-panel">
             <div class="panel-header">
                 <span>组件库</span>
-                <button id="close-edit-btn"><i class="ri-close-line"></i></button>
+                <div style="display:flex;gap:10px;">
+                   <button id="settings-btn" title="设置"><i class="ri-settings-3-line"></i></button>
+                   <button id="close-edit-btn"><i class="ri-close-line"></i></button>
+                </div>
             </div>
             <div class="panel-content" id="component-list">
                 <!-- Component Items -->
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;background:#333;border-radius:8px;z-index:100;padding:20px;color:white;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3>设置</h3>
+            <div style="margin:20px 0;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="setting-show-seconds"> 显示秒 (Show Seconds)
+                </label>
+            </div>
+            <div style="text-align:right;">
+                <button id="close-settings-btn" style="padding:5px 15px;cursor:pointer;">关闭</button>
             </div>
         </div>
 

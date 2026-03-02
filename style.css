@@ -27,6 +27,97 @@ body {
     pointer-events: none; /* Let clicks pass through container */
     user-select: none;
     -webkit-user-select: none;
+    padding-left: 20px; /* Base offset */
+}
+
+/* Time Component (Built-in) */
+#time-display {
+    height: 48px; /* Taller than widgets/notification */
+    min-width: 80px;
+    background: rgba(51, 51, 51, 0.85); /* Semi-transparent */
+    color: white;
+    border-radius: 8px; /* Reduced radius */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    pointer-events: auto;
+    transition: all 0.3s;
+    margin-right: 10px; /* Gap between time and widgets */
+}
+
+/* Front Layer Container */
+#front-layer {
+    position: relative;
+    z-index: 20; /* High z-index (Front) */
+    display: flex;
+    align-items: center;
+    padding-left: 20px; /* Offset from screen edge */
+    height: 100%;
+}
+
+/* Widgets Area (Inner) */
+#widgets-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+    width: auto;
+    pointer-events: auto; /* Allow interaction */
+}
+
+/* Notification Container (Back Layer) */
+#notification-container {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 100px; /* Start behind the Time/Widgets area approx */
+    /* Wait, if it's behind, it should align with the main container logic? 
+       User said: "A rounded rectangle area as container for time and remaining components"
+       But "Widgets are placed directly to the right of the clock, not in the layer behind".
+       "Layer behind is for notifications".
+       
+       Let's position it to span where notifications should be.
+       Maybe fixed position or relative to status-bar-container.
+    */
+    left: 30px; /* Slight offset */
+    height: 40px; /* Shorter than time */
+    background: transparent; /* Default hidden */
+    border-radius: 12px;
+    z-index: 10; /* Lower z-index (Back) */
+    display: flex;
+    align-items: center;
+    padding-left: 80px; /* Pad to clear the Time component visually if they overlap */
+    padding-right: 15px;
+    transition: all 0.3s;
+    pointer-events: none;
+}
+
+/* Notification Display (Text) */
+#notification-display {
+    color: white;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#notification-display.show {
+    opacity: 1;
+}
+
+/* When notification is active, show the container background? */
+#notification-container.active {
+    background: rgba(0, 123, 255, 0.9); /* Or theme color */
+    /* If it's "behind", Time will cover the left part. */
+    padding-left: 80px; 
+    min-width: 200px; /* Ensure some width */
+    pointer-events: auto;
 }
 
 /* Edit Mode Layout */
@@ -43,6 +134,31 @@ body.edit-mode #status-bar-container {
     border: 2px dashed rgba(255, 255, 255, 0.3);
     background: rgba(40, 40, 40, 0.95);
     pointer-events: auto;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Reset layout for Edit Mode */
+body.edit-mode #front-layer {
+    padding-left: 0;
+    justify-content: center;
+}
+
+body.edit-mode #notification-container {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    width: 100%;
+    justify-content: center;
+    padding: 5px;
+}
+
+body.edit-mode #notification-display {
+    opacity: 1;
+    content: "Notification Area (Preview)";
 }
 
 /* Widgets Area */

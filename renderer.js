@@ -12,15 +12,23 @@ const editOverlay = document.getElementById('edit-overlay');
 const componentList = document.getElementById('component-list');
 const closeEditBtn = document.getElementById('close-edit-btn');
 
+const timeText = document.getElementById('time-text');
+const notificationDisplay = document.getElementById('notification-display');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const settingShowSeconds = document.getElementById('setting-show-seconds');
+
+let config = {
+    showSeconds: false
+};
+
 // Initialization
 async function init() {
     // 1. Load Components from System
     try {
         const res = await ipcRenderer.invoke('sidebar-status:get-components');
         if (Array.isArray(res)) {
-            // Filter components suitable for status bar? 
-            // For now, allow all, but maybe user should be careful.
-            // Ideally we'd filter by a tag like "status-bar-widget" but generic is fine.
             availableComponents = res;
         } else if (res && res.components) {
             availableComponents = res.components;
@@ -28,23 +36,43 @@ async function init() {
     } catch (e) {
         console.error('Error loading components:', e);
     }
-
-    // 2. Load Saved Config
+    
+    // 2. Load Config
     try {
-        const config = await ipcRenderer.invoke('sidebar-status:load-config');
-        if (config && config.widgets) {
-            widgets = config.widgets;
+        const loadedConfig = await ipcRenderer.invoke('sidebar-status:load-config');
+        if (loadedConfig) {
+            if (loadedConfig.widgets) widgets = loadedConfig.widgets;
+            if (loadedConfig.showSeconds !== undefined) config.showSeconds = loadedConfig.showSeconds;
         }
-    } catch (e) {
-        console.error('Error loading config:', e);
-    }
+    } catch (e) { console.error(e); }
 
-    // 3. Render Initial State
+    // Init UI based on config
+    if (settingShowSeconds) settingShowSeconds.checked = config.showSeconds;
+
+    // 3. Render
+    widgets = widgets.filter(w => w.componentId !== 'sidebar-clock' && w.componentId !== 'sidebar-digital-clock');
     renderWidgets();
     renderComponentPanel();
-
-    // 4. Setup Event Listeners
+    setupTime();
+    
     setupEventListeners();
+}
+
+function setupTime() {
+    const update = () => {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        let text = `${hours}:${minutes}`;
+        if (config.showSeconds) {
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            text += `:${seconds}`;
+        }
+        timeText.textContent = text;
+    };
+    
+    update();
+    setInterval(update, 1000);
 }
 
 function setupEventListeners() {
@@ -52,31 +80,32 @@ function setupEventListeners() {
     ipcRenderer.on('toggle-edit-mode', () => toggleEditMode());
     
     // Close Button
-    closeEditBtn.onclick = (e) => {
-        e.stopPropagation();
-        toggleEditMode(false);
-    };
+    if (closeEditBtn) {
+        closeEditBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleEditMode(false);
+        };
+    }
 
     // Overlay Click Handling
-    editOverlay.addEventListener('click', (e) => {
-        // Prevent default browser behavior if needed
-        // e.preventDefault();
-        
-        // Debug target
-        console.log('Overlay click target:', e.target);
+    if (editOverlay) {
+        editOverlay.addEventListener('click', (e) => {
+            // Debug target
+            console.log('Overlay click target:', e.target);
 
-        // CASE 1: Clicked on the backdrop (the semi-transparent part)
-        if (e.target.classList.contains('edit-backdrop')) {
-            toggleEditMode(false);
-            return;
-        }
+            // CASE 1: Clicked on the backdrop (the semi-transparent part)
+            if (e.target.classList.contains('edit-backdrop')) {
+                toggleEditMode(false);
+                return;
+            }
 
-        // CASE 2: Clicked on the overlay container itself (empty space not covered by panel)
-        if (e.target === editOverlay) {
-            toggleEditMode(false);
-            return;
-        }
-    });
+            // CASE 2: Clicked on the overlay container itself (empty space not covered by panel)
+            if (e.target === editOverlay) {
+                toggleEditMode(false);
+                return;
+            }
+        });
+    }
 
     // Prevent any click inside the panel from reaching the overlay
     const panel = document.getElementById('component-panel');
@@ -87,14 +116,99 @@ function setupEventListeners() {
     }
 
     // Prevent any click inside the status bar from reaching the overlay (important in Edit Mode)
-    statusBar.addEventListener('click', (e) => {
-        if (isEditMode) {
-            e.stopPropagation();
-        }
-    });
+    if (statusBar) {
+        statusBar.addEventListener('click', (e) => {
+            if (isEditMode) {
+                e.stopPropagation();
+            }
+        });
+    }
 
     // Drag & Drop
     setupDragAndDrop();
+    
+    // Settings Logic
+    if (settingsBtn) {
+        settingsBtn.onclick = (e) => {
+            e.stopPropagation();
+            // Show settings modal
+            settingsModal.style.display = 'block';
+        };
+    }
+    
+    if (closeSettingsBtn) {
+        closeSettingsBtn.onclick = (e) => {
+            e.stopPropagation();
+            settingsModal.style.display = 'none';
+        };
+    }
+    
+    if (settingShowSeconds) {
+        settingShowSeconds.onchange = (e) => {
+            config.showSeconds = e.target.checked;
+            saveGlobalConfig();
+            // Immediate update
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            let text = `${hours}:${minutes}`;
+            if (config.showSeconds) {
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                text += `:${seconds}`;
+            }
+            timeText.textContent = text;
+        };
+    }
+
+    // Notification Logic
+    ipcRenderer.on('show-notification', (event, payload) => {
+        showNotification(payload);
+    });
+    
+    ipcRenderer.on('open-settings', () => {
+        toggleEditMode(true);
+        settingsModal.style.display = 'block';
+    });
+}
+
+function saveGlobalConfig() {
+    ipcRenderer.invoke('sidebar-status:save-config', { 
+        widgets,
+        showSeconds: config.showSeconds
+    });
+}
+
+const notificationContainer = document.getElementById('notification-container');
+
+// ...
+
+let notificationTimeout = null;
+function showNotification(payload) {
+    if (!notificationDisplay) return;
+    
+    // Format: Title - Subtext (or just Title)
+    let text = payload.title || payload.text || '';
+    if (payload.subText) {
+        text += ` - ${payload.subText}`;
+    }
+    
+    notificationDisplay.textContent = text;
+    notificationDisplay.classList.add('show');
+    if (notificationContainer) notificationContainer.classList.add('active');
+    
+    if (notificationTimeout) clearTimeout(notificationTimeout);
+    
+    const duration = payload.duration || 5000;
+    notificationTimeout = setTimeout(() => {
+        notificationDisplay.classList.remove('show');
+        if (notificationContainer) notificationContainer.classList.remove('active');
+    }, duration);
+}
+
+// Override saveConfig to use saveGlobalConfig
+function saveConfig() {
+    saveGlobalConfig();
+    // Update bar width logic...
 }
 
 function setupDragAndDrop() {
@@ -244,7 +358,7 @@ function removeWidget(id) {
 }
 
 function saveConfig() {
-    ipcRenderer.invoke('sidebar-status:save-config', { widgets });
+    saveGlobalConfig();
     
     // Update bar width
     setTimeout(() => {
